@@ -29,8 +29,8 @@ This project allows you to manually control a car in OpenAI Gym's `CarRacing-v2`
 Clone the repository to your local machine:
 
 ```bash
-git clone <repository_url>
-cd <repository_directory>
+git clone https://github.com/CagriCatik/SDC-OpenAI
+cd SDC-OpenAI
 ```
 
 ### 2. Run the Installation Script

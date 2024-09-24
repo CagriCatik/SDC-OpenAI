@@ -15,13 +15,15 @@ def curvature(waypoints):
     '''
     delta_waypoints = waypoints[:, 1:] - waypoints[:, :-1]  # Shape: [2, N-1]
     delta_waypoints_normalized = normalize(delta_waypoints)  # Shape: [2, N-1]
+    
     # Compute dot products between consecutive normalized vectors
     dots = np.sum(delta_waypoints_normalized[:, :-1] * delta_waypoints_normalized[:, 1:], axis=0)
+    
     # Curvature term as per the objective function
     curvature = np.sum(dots)
     return curvature
 
-def smoothing_objective(waypoints_flat, waypoints_center_flat, beta=40):
+def smoothing_objective(waypoints_flat, waypoints_center_flat, beta=30):
     '''
     Objective function for path smoothing.
 
@@ -88,8 +90,8 @@ def waypoint_prediction(roadside1_spline, roadside2_spline, num_waypoints=6, way
 
         return waypoints_smoothed
 
-def target_speed_prediction(waypoints, num_waypoints_used=5,
-                            max_speed=60, min_speed=30, K_v=4.5):
+def target_speed_prediction(waypoints, num_waypoints_used=4,
+                            max_speed=30, min_speed=15, K_v=2.5):
     '''
     Predict target speed given waypoints using curvature.
 

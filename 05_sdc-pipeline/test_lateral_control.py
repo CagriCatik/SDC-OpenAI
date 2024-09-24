@@ -1,65 +1,70 @@
 import gym
-from gym.envs.box2d.car_racing import CarRacing
+import numpy as np
+import matplotlib.pyplot as plt
 
 from lane_detection import LaneDetection
 from waypoint_prediction import waypoint_prediction, target_speed_prediction
 from lateral_control import LateralController
-import matplotlib.pyplot as plt
-import numpy as np
-import pyglet
-from pyglet import gl
-from pyglet.window import key
 
-# action variables 
-a = np.array( [0.0, 0.1, 0.0] )
-
-# init environement
-env = CarRacing()
-env.render()
+# Initialize environment using gym.make()
+env = gym.make('CarRacing-v2', render_mode='human')
 env.reset()
 
-# define variables
+# Define variables
 total_reward = 0.0
 steps = 0
 restart = False
 
-# init modules of the pipeline
+# Initialize modules of the pipeline
 LD_module = LaneDetection()
 LatC_module = LateralController()
 
-# init extra plot
+# Initialize extra plot
 fig = plt.figure()
 plt.ion()
 plt.show()
 
+# Action variables: [steering, gas, brake]
+a = np.array([0.0, 0.0, 0.0])
+
 while True:
-    # perform step
-    s, r, done, speed, info = env.step(a)
+    # Perform step
+    observation, reward, terminated, truncated, info = env.step(a)
+    done = terminated or truncated
 
-    # lane detection
-    lane1, lane2 = LD_module.lane_detection(s)
+    # Lane detection
+    lane1, lane2 = LD_module.lane_detection(observation)
 
-    # waypoint and target_speed prediction
+    # Waypoint and target_speed prediction
     waypoints = waypoint_prediction(lane1, lane2)
     target_speed = target_speed_prediction(waypoints)
 
-    # control with constant gas and no braking
+    # Control with constant gas and no braking
+    # Obtain the speed from the info dictionary if available
+    if 'speed' in info:
+        speed = info['speed']
+    else:
+        # Alternatively, estimate speed or set a default value
+        speed = 0.1  # Replace with appropriate speed estimation if necessary
+
+    # Update steering angle using the lateral controller
     a[0] = LatC_module.stanley(waypoints, speed)
 
-    # reward
-    total_reward += r
+    # Update total reward
+    total_reward += reward
 
-    # outputs during training
+    # Outputs during training
     if steps % 2 == 0 or done:
         print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
-        print("targetspeed {:+0.2f}".format(target_speed))
-        LD_module.plot_state_lane(s, steps, fig, waypoints=waypoints)
+        print("target_speed {:+0.2f}".format(target_speed))
+        LD_module.plot_state_lane(observation, steps, fig, waypoints=waypoints)
 
     steps += 1
     env.render()
 
-    # check if stop
-    if done or restart or steps>=600: 
+    # Check if stop
+    if done or restart or steps >= 600:
         print("step {} total_reward {:+0.2f}".format(steps, total_reward))
         break
+
 env.close()

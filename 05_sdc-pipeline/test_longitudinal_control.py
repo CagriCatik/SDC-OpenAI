@@ -1,70 +1,76 @@
 import gym
-from gym.envs.box2d.car_racing import CarRacing
+import numpy as np
+import matplotlib.pyplot as plt
+
 from lane_detection import LaneDetection
 from waypoint_prediction import waypoint_prediction, target_speed_prediction
 from lateral_control import LateralController
 from longitudinal_control import LongitudinalController
-import matplotlib.pyplot as plt
-import numpy as np
-import pyglet
-from pyglet import gl
-from pyglet.window import key
 
-# action variables
-a = np.array( [0.0, 0.0, 0.0] )
-
-# init environement
-env = CarRacing()
-env.render()
+# Initialize environment using gym.make()
+env = gym.make('CarRacing-v2', render_mode='human')
 env.reset()
 
-# define variables
+# Define variables
 total_reward = 0.0
 steps = 0
 restart = False
 
-# init modules of the pipeline
+# Initialize modules of the pipeline
 LD_module = LaneDetection()
 LatC_module = LateralController()
 LongC_module = LongitudinalController()
 
-# init extra plot
+# Initialize extra plot
 fig = plt.figure()
 plt.ion()
 plt.show()
 
+# Action variables
+a = np.array([0.0, 0.0, 0.0])  # [steering, gas, brake]
 
 while True:
-    # perform step
-    s, r, done, speed, info = env.step(a)
+    # Perform step
+    observation, reward, terminated, truncated, info = env.step(a)
+    done = terminated or truncated
 
-    # lane detection
-    lane1, lane2 = LD_module.lane_detection(s)
+    # Lane detection
+    lane1, lane2 = LD_module.lane_detection(observation)
 
-    # waypoint and target_speed prediction
+    # Waypoint and target_speed prediction
     waypoints = waypoint_prediction(lane1, lane2)
-    target_speed = target_speed_prediction(waypoints, max_speed=60, exp_constant=4.5)
+    target_speed = target_speed_prediction(waypoints, max_speed=60, K_v=4.5)
 
-    # control
+    # Obtain the speed from the info dictionary or estimate it
+    if 'speed' in info:
+        speed = info['speed']
+    else:
+        # Alternatively, estimate speed or set a default value
+        # Here, we estimate speed based on the car's linear velocity
+        car = env.unwrapped.car
+        speed = np.linalg.norm([car.hull.linearVelocity.x, car.hull.linearVelocity.y])
+
+    # Control
     a[0] = LatC_module.stanley(waypoints, speed)
     a[1], a[2] = LongC_module.control(speed, target_speed)
 
-    # reward
-    total_reward += r
+    # Update total reward
+    total_reward += reward
 
-    # outputs during training
+    # Outputs during training
     if steps % 2 == 0 or done:
         print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
         print("speed {:+0.2f} targetspeed {:+0.2f}".format(speed, target_speed))
 
-        #LD_module.plot_state_lane(s, steps, fig, waypoints=waypoints)
+        # Uncomment the following line if you want to plot lane detection
+        # LD_module.plot_state_lane(observation, steps, fig, waypoints=waypoints)
         LongC_module.plot_speed(speed, target_speed, steps, fig)
 
     steps += 1
     env.render()
 
-    # check if stop
-    if done or restart or steps>=600: 
+    # Check if stop
+    if done or restart or steps >= 600:
         print("step {} total_reward {:+0.2f}".format(steps, total_reward))
         break
 
